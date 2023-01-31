@@ -101,23 +101,77 @@ bronze_to_silverdf_stations = spark.read.format("delta").load("/tmp/Abdus/Bronze
 # COMMAND ----------
 
 #Show datatypes
+print("Trip schema")
 bronze_to_silverdf_trip.printSchema()
+
+print("Payments schema")
+bronze_to_silverdf_payments.printSchema()
+
+print("Riders schema")
+bronze_to_silverdf_riders.printSchema()
+
+print("Stations schema")
+bronze_to_silverdf_stations.printSchema()
 
 # COMMAND ----------
 
-from pyspark.sql.functions import col, cast, unix_timestamp, from_unixtime, date_format
+from pyspark.sql.functions import col, cast, unix_timestamp, from_unixtime, date_format, to_date
 #New defined schema for silver
 
-#Silver Trip DF
-silver_trip_df = bronze_to_silverdf_trip.withColumn("trip_id", bronze_to_silverdf_trip["trip_id"].cast("integer")) \
+#Silver Trips DF
+silver_trips_df = bronze_to_silverdf_trip.withColumn("trip_id", bronze_to_silverdf_trip["trip_id"].cast("string")) \
                                         .withColumn("rideable_type", bronze_to_silverdf_trip["rideable_type"].cast("string")) \
-                                        .withColumn("started_at", from_unixtime(unix_timestamp(col("started_at"), "dd/MM/yyyy HH:mm"))) \
-                                        .withColumn("ended_at", from_unixtime(unix_timestamp(col("ended_at"), "dd/MM/yyyy HH:mm"))) \
-                                        .withColumn("started_at", date_format(col("started_at"), "dd/MM/yyyy HH:mm")) \
-                                        .withColumn("ended_at", date_format(col("ended_at"), "dd/MM/yyyy HH:mm")) \
-                                        .withColumn("start_station_id", bronze_to_silverdf_trip["start_station_id"].cast("integer")) \
-                                        .withColumn("end_station_id", bronze_to_silverdf_trip["end_station_id"].cast("integer")) \
-                                        .withColumn("rider_id", bronze_to_silverdf_trip["rider_id"].cast("integer")) \
-    
-print(silver_trip_df)
-display(silver_trip_df)
+                                        .withColumn("started_at", unix_timestamp(bronze_to_silverdf_trip["started_at"], "dd/MM/yyyy HH:mm").cast("timestamp")) \
+                                        .withColumn("ended_at", unix_timestamp(bronze_to_silverdf_trip["ended_at"], "dd/MM/yyyy HH:mm").cast("timestamp")) \
+                                        .withColumn("start_station_id", bronze_to_silverdf_trip["start_station_id"].cast("string")) \
+                                        .withColumn("end_station_id", bronze_to_silverdf_trip["end_station_id"].cast("string")) \
+                                        .withColumn("rider_id", bronze_to_silverdf_trip["rider_id"].cast("integer"))
+
+#Silver Payments DF
+silver_payments_df = bronze_to_silverdf_payments.withColumn("payment_id", bronze_to_silverdf_payments["payment_id"].cast("integer")) \
+                                        .withColumn("date", bronze_to_silverdf_payments["date"].cast("date")) \
+                                        .withColumn("amount", bronze_to_silverdf_payments["amount"].cast("float")) \
+                                        .withColumn("rider_id", bronze_to_silverdf_payments["rider_id"].cast("integer"))
+
+#Silver Riders DF
+silver_riders_df = bronze_to_silverdf_riders.withColumn("rider_id", bronze_to_silverdf_riders["rider_id"].cast("integer")) \
+                                        .withColumn("first", bronze_to_silverdf_riders["first"].cast("string")) \
+                                        .withColumn("last", bronze_to_silverdf_riders["last"].cast("string")) \
+                                        .withColumn("address", bronze_to_silverdf_riders["address"].cast("string")) \
+                                        .withColumn("birthday", bronze_to_silverdf_riders["birthday"].cast("date")) \
+                                        .withColumn("account_start", bronze_to_silverdf_riders["account_start"].cast("date")) \
+                                        .withColumn("account_end", bronze_to_silverdf_riders["account_end"].cast("date")) \
+                                        .withColumn("is_member", bronze_to_silverdf_riders["is_member"].cast("boolean"))
+
+#Silver Stations DF
+silver_stations_df = bronze_to_silverdf_stations.withColumn("station_id", bronze_to_silverdf_stations["station_id"].cast("string")) \
+                                        .withColumn("name", bronze_to_silverdf_stations["name"].cast("string")) \
+                                        .withColumn("longitude", bronze_to_silverdf_stations["longitude"].cast("float")) \
+                                        .withColumn("latitude", bronze_to_silverdf_stations["latitude"].cast("float"))
+
+
+
+# COMMAND ----------
+
+display(silver_trips_df)
+
+display(silver_payments_df)
+
+display(silver_riders_df)
+
+display(silver_stations_df)
+
+# COMMAND ----------
+
+#Show datatypes
+print("Trip schema")
+silver_trips_df.printSchema()
+
+print("Payments schema")
+silver_payments_df.printSchema()
+
+print("Riders schema")
+silver_riders_df.printSchema()
+
+print("Stations schema")
+silver_stations_df.printSchema()
