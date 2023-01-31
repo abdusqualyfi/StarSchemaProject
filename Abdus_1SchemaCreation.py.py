@@ -232,11 +232,44 @@ display(times_dim_df)
 payment_fact_df = silver_to_golddf_payments.join(dates_dim_df, on="date", how="left").select("payment_id", "rider_id", "date_id", "amount")
 
 #trip fact table
-trip_fact_df = silver_to_golddf_trips.join(bike_dim_df, on="rideable_type", how="left").select("trip_id", "rider_id", "bike_id", "started_at", "ended_at", "start_station_id", "end_station_id")
+trip_fact_df = silver_to_golddf_trips.join(bike_dim_df, on="rideable_type", how="left") \
+                .select("trip_id", "rider_id", "bike_id", "started_at", "ended_at", "start_station_id", "end_station_id")
 
+#trip_dates_combined_df = dates_started_df.union(dates_ended_df) #retrieved from previous code block
 
-#display(payment_fact_df)
-display(trip_fact_df)
+#Create date and time table (combine started_at and ended_at from trip table)
+trip_fact_df = trip_fact_df.withColumn("started_at", col("started_at").cast("string"))
+trip_fact_df = trip_fact_df.withColumn("ended_at", col("ended_at").cast("string"))
+
+trip_fact_df = trip_fact_df.withColumn("started_date", split(trip_fact_df["started_at"], " ")[0])
+trip_fact_df = trip_fact_df.withColumn("started_time", split(col("started_at"), " ")[1].substr(0,5))
+
+trip_fact_df = trip_fact_df.withColumn("ended_date", split(trip_fact_df["ended_at"], " ")[0])
+trip_fact_df2 = trip_fact_df.withColumn("ended_time", split(col("ended_at"), " ")[1].substr(0,5))
+
+trip_fact_df_sd = trip_fact_df2.join(dates_dim_df, trip_fact_df2.started_date == dates_dim_df.date, how="left") \
+                .withColumnRenamed("date_id", "started_date_id") \
+                .drop("date") \
+                .join(dates_dim_df, trip_fact_df2.ended_date == dates_dim_df.date, how="left") \
+                .withColumnRenamed("date_id", "ended_date_id") \
+                .drop("date")
+
+trip_fact_df_st = trip_fact_df_sd.join(times_dim_df, trip_fact_df_sd.started_time == times_dim_df.time, how="left") \
+                .withColumnRenamed("time_id", "started_time_id") \
+                .drop("time") \
+                .join(times_dim_df, trip_fact_df_sd.ended_time == times_dim_df.time, how="left") \
+                .withColumnRenamed("time_id", "ended_time_id") \
+                .drop("time") \
+                .select("trip_id", "rider_id", "bike_id", "start_station_id", "end_station_id", "started_date_id", "started_time_id", "ended_date_id", "ended_time_id")
+                
+                
+
+display(trip_fact_df_st)
+#display(trip_fact_df2)
+#display(dates_dim_df)
+
+# COMMAND ----------
+
 
 
 # COMMAND ----------
