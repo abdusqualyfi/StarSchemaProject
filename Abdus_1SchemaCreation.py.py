@@ -2,8 +2,8 @@
 import zipfile, subprocess, glob
 
 #Directories - ensure / is at the end
-main_folder = "/tmp/Abdus/"
-zip_location_folder ="/dbfs/tmp/landing/"
+main_folder = "/tmp/Abdus/" #This folder has to exist first for it to work
+zip_location_folder = "/dbfs/tmp/landing/"
 zip_output_folder = "/dbfs/tmp/Abdus/landing"
 dbfs_directory = 'dbfs:/tmp/Abdus/landing/'
 
@@ -11,10 +11,9 @@ dbfs_directory = 'dbfs:/tmp/Abdus/landing/'
 dbutils.fs.rm(main_folder, True)
 
 #Extract all zips in a given location
-landing_location_zips = zip_location_folder + "*.zip"
-zip_files = glob.glob(landing_location_zips)
+zip_files = glob.glob("/dbfs/tmp/landing/*.zip")
 for zip_file in zip_files:
-    extract_to_dir = zip_output_folder
+    extract_to_dir = "/dbfs/tmp/Abdus/landing"
     subprocess.call(["unzip", "-d", extract_to_dir, zip_file])
 
 #Check directory exists and has the extract csv files in it
@@ -164,8 +163,8 @@ silver_stations_df.write.format("delta").mode("overwrite").save(main_folder + "S
 # COMMAND ----------
 
 #Open Silver folder delta
-silver_to_golddf_trip = spark.read.format("delta").load(main_folder + "Silver/trips")
-display(silver_to_golddf_trip)
+silver_to_golddf_trips = spark.read.format("delta").load(main_folder + "Silver/trips")
+display(silver_to_golddf_trips)
 
 silver_to_golddf_payments = spark.read.format("delta").load(main_folder + "Silver/payments")
 #display(silver_to_golddf_payments)
@@ -180,16 +179,66 @@ silver_to_golddf_stations = spark.read.format("delta").load(main_folder + "Silve
 
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
+from pyspark.sql.functions import split
 
 #Create dimension tables
 
 #Create Bike table
 bike_window = Window.orderBy("rideable_type")
 
-bike_df = silver_to_golddf_trip.select("rideable_type").distinct() \
+bike_dim_df = silver_to_golddf_trips.select("rideable_type").distinct() \
             .withColumn("bike_id", F.row_number().over(bike_window))  \
             .select("bike_id", "rideable_type")
 
-display(bike_df)
-print(bike_df)
+#display(bike_dim_df)
+#print(bike_df)
+
+#Create date and time table (combine started_at and ended_at from trip table)
+dates_started_df = silver_to_golddf_trips.select("started_at")
+dates_ended_df = silver_to_golddf_trips.select("ended_at").withColumnRenamed("ended_at", "started_at")
+
+dates_combined_df = dates_started_df.union(dates_ended_df).distinct()
+dates_combined_df = dates_combined_df.withColumn("started_at", col("started_at").cast("string"))
+
+dates_df_datetime = dates_combined_df.withColumn("date", split(dates_combined_df["started_at"], " ")[0])
+dates_df_datetime = dates_df_datetime.withColumn("time", split(col("started_at"), " ")[1].substr(0,5)).select("date", "time")
+
+#dates table (combine trip and payment dates)
+payments_date_df = silver_to_golddf_payments.select("date")
+trips_date_df = dates_df_datetime.select("date")
+pt_dates_combined_df = payments_date_df.union(trips_date_df).distinct()
+
+dates_window = Window.orderBy("date")
+dates_dim_df = pt_dates_combined_df.select("date") \
+            .withColumn("date_id", F.row_number().over(dates_window)) \
+            .select("date_id", "date")
+
+#time table
+time_window = Window.orderBy("time")
+times_dim_df = dates_df_datetime.select("time").distinct() \
+            .withColumn("time_id", F.row_number().over(time_window)) \
+            .select("time_id", "time")
+
+display(bike_dim_df)
+display(dates_dim_df)
+display(times_dim_df)
+
+
+# COMMAND ----------
+
+#Establish joins and relationships
+
+#payment fact table
+payment_fact_df = silver_to_golddf_payments.join(dates_dim_df, on="date", how="left").select("payment_id", "rider_id", "date_id", "amount")
+
+#trip fact table
+trip_fact_df = silver_to_golddf_trips.join(bike_dim_df, on="rideable_type", how="left").select("trip_id", "rider_id", "bike_id", "started_at", "ended_at", "start_station_id", "end_station_id")
+
+
+#display(payment_fact_df)
+display(trip_fact_df)
+
+
+# COMMAND ----------
+
 
