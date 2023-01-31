@@ -235,7 +235,6 @@ payment_fact_df = silver_to_golddf_payments.join(dates_dim_df, on="date", how="l
 trip_fact_df = silver_to_golddf_trips.join(bike_dim_df, on="rideable_type", how="left") \
                 .select("trip_id", "rider_id", "bike_id", "started_at", "ended_at", "start_station_id", "end_station_id")
 
-#trip_dates_combined_df = dates_started_df.union(dates_ended_df) #retrieved from previous code block
 
 #Create date and time table (combine started_at and ended_at from trip table)
 trip_fact_df = trip_fact_df.withColumn("started_at", col("started_at").cast("string"))
@@ -259,8 +258,7 @@ trip_fact_df_st = trip_fact_df_sd.join(times_dim_df, trip_fact_df_sd.started_tim
                 .drop("time") \
                 .join(times_dim_df, trip_fact_df_sd.ended_time == times_dim_df.time, how="left") \
                 .withColumnRenamed("time_id", "ended_time_id") \
-                .drop("time") \
-                .select("trip_id", "rider_id", "bike_id", "start_station_id", "end_station_id", "started_date_id", "started_time_id", "ended_date_id", "ended_time_id")
+                .drop("time")
                 
                 
 
@@ -270,8 +268,36 @@ display(trip_fact_df_st)
 
 # COMMAND ----------
 
+from pyspark.sql.functions import datediff
+#print(silver_to_golddf_trips)
+#print(trip_fact_df2) #cast started_at and ended_at as timestamp
 
+trip_fact_df_st2 = trip_fact_df_st.withColumn("trip_duration", (unix_timestamp(col("ended_at")) - unix_timestamp(col("started_at")))/60) \
+                    .select("trip_id", "rider_id", "bike_id", "start_station_id", "end_station_id", "started_date_id", "started_time_id", "ended_date_id", "ended_time_id", "trip_duration", "started_date")    
+
+rider_bday = silver_to_golddf_riders.select("rider_id", "birthday")
+
+trip_fact_df_st3 = trip_fact_df_st2.join(rider_bday, on="rider_id", how="left")
+
+
+trip_fact_fin = trip_fact_df_st3.withColumn("rider_age", (datediff(col("started_date"), col("birthday"))/365).cast("int")) \
+                .select("trip_id", "rider_id", "bike_id", "start_station_id", "end_station_id", "started_date_id", "started_time_id", "ended_date_id", "ended_time_id", "trip_duration", "rider_age")
+
+print(trip_fact_fin)
+display(trip_fact_fin)
 
 # COMMAND ----------
 
+#Save to delta in Gold folder
 
+#facts
+trip_fact_fin.write.format("delta").mode("overwrite").save(main_folder + "Gold/fact_trips")
+payment_fact_df.write.format("delta").mode("overwrite").save(main_folder + "Gold/fact_payments")
+
+#dim
+silver_to_golddf_riders.write.format("delta").mode("overwrite").save(main_folder + "Gold/dim_riders")
+silver_to_golddf_stations.write.format("delta").mode("overwrite").save(main_folder + "Gold/dim_stations")
+bike_dim_df.write.format("delta").mode("overwrite").save(main_folder + "Gold/dim_bikes")
+dates_dim_df.write.format("delta").mode("overwrite").save(main_folder + "Gold/dim_dates")
+times_dim_df.write.format("delta").mode("overwrite").save(main_folder + "Gold/dim_times")
+#########################################################################END OF SILVER NOTEBOOK#########################################################################
