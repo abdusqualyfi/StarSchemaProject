@@ -9,6 +9,7 @@ dbfs_directory = 'dbfs:/tmp/Abdus/landing/'
 
 #Delete everything in destination folder
 dbutils.fs.rm(main_folder, True)
+dbutils.fs.mkdirs(main_folder)
 
 #Extract all zips in a given location
 zip_files = glob.glob("/dbfs/tmp/landing/*.zip")
@@ -283,6 +284,11 @@ trip_fact_df_st3 = trip_fact_df_st2.join(rider_bday, on="rider_id", how="left")
 trip_fact_fin = trip_fact_df_st3.withColumn("rider_age", (datediff(col("started_date"), col("birthday"))/365).cast("int")) \
                 .select("trip_id", "rider_id", "bike_id", "start_station_id", "end_station_id", "started_date_id", "started_time_id", "ended_date_id", "ended_time_id", "trip_duration", "rider_age")
 
+trip_fact_fin = trip_fact_fin.withColumn('trip_duration', col('trip_duration').cast('int'))
+
+#recast as date
+dates_dim_df = dates_dim_df.withColumn('date', col('date').cast('date'))
+
 print(trip_fact_fin)
 display(trip_fact_fin)
 
@@ -301,3 +307,151 @@ bike_dim_df.write.format("delta").mode("overwrite").save(main_folder + "Gold/dim
 dates_dim_df.write.format("delta").mode("overwrite").save(main_folder + "Gold/dim_dates")
 times_dim_df.write.format("delta").mode("overwrite").save(main_folder + "Gold/dim_times")
 #########################################################################END OF SILVER NOTEBOOK#########################################################################
+
+# COMMAND ----------
+
+
+#Open Gold folder delta
+gold_df_f_trips = spark.read.format("delta").load(main_folder + "Gold/fact_trips")
+gold_df_f_payments = spark.read.format("delta").load(main_folder + "Gold/fact_payments")
+
+gold_df_d_riders = spark.read.format("delta").load(main_folder + "Gold/dim_riders")
+gold_df_d_stations = spark.read.format("delta").load(main_folder + "Gold/dim_stations")
+gold_df_d_bikes = spark.read.format("delta").load(main_folder + "Gold/dim_bikes")
+gold_df_d_dates = spark.read.format("delta").load(main_folder + "Gold/dim_dates")
+gold_df_d_times = spark.read.format("delta").load(main_folder + "Gold/dim_times")
+
+
+display(gold_df_f_trips) #show trips fact table
+display(gold_df_f_payments)
+display(gold_df_d_riders)
+display(gold_df_d_stations)
+display(gold_df_d_bikes)
+display(gold_df_d_dates)
+display(gold_df_d_times) 
+
+# COMMAND ----------
+
+#Test Queries
+print(gold_df_f_trips) #show trips fact table
+print(gold_df_f_payments)
+print(gold_df_d_riders)
+print(gold_df_d_stations)
+print(gold_df_d_bikes)
+print(gold_df_d_dates)
+print(gold_df_d_times) 
+
+# COMMAND ----------
+
+from pyspark.sql.functions import date_format, avg, substring
+
+#Analyse how much time is spent per ride
+
+#1A) Based on date and time factors such as day of week
+timeSpentPerRide_date = gold_df_f_trips.join(gold_df_d_dates, gold_df_f_trips.started_date_id == gold_df_d_dates.date_id, how="left") \
+                            .withColumnRenamed("date", "trip_start_date") \
+                            .drop("date_id")
+
+timeSpentPerRide_date = timeSpentPerRide_date.withColumn("day_of_week", date_format(timeSpentPerRide_date["trip_start_date"], "E"))
+
+timeSpentPerRide_date = timeSpentPerRide_date.groupBy("day_of_week").agg(avg("trip_duration").alias("avg_trip_duration")).orderBy("day_of_week")
+timeSpentPerRide_date = timeSpentPerRide_date.withColumn("avg_trip_duration", round(timeSpentPerRide_date["avg_trip_duration"], 2))
+display(timeSpentPerRide_date)
+
+#1B) Based on date and time factors such as time of day
+timeSpentPerRide_time = gold_df_f_trips.join(gold_df_d_times, gold_df_f_trips.started_time_id == gold_df_d_times.time_id, how="left") \
+                            .withColumnRenamed("time", "trip_start_time") \
+                            .drop("time_id")
+
+timeSpentPerRide_time = timeSpentPerRide_time.withColumn("trip_start_time", substring(timeSpentPerRide_time["trip_start_time"], 1, 2))
+
+timeSpentPerRide_time = timeSpentPerRide_time.groupBy("trip_start_time").agg(avg("trip_duration").alias("avg_trip_duration")).orderBy("trip_start_time")
+timeSpentPerRide_time = timeSpentPerRide_time.withColumn("avg_trip_duration", round(timeSpentPerRide_time["avg_trip_duration"], 2))
+display(timeSpentPerRide_time)
+
+# COMMAND ----------
+
+#1C) Based on which station is the starting station
+timeSpentPerRide_StartStation = gold_df_f_trips.join(gold_df_d_stations, gold_df_f_trips.start_station_id == gold_df_d_stations.station_id, how="left") \
+                            .withColumnRenamed("name", "trip_start_station") \
+                            .drop("station_id")
+
+timeSpentPerRide_StartStation = timeSpentPerRide_StartStation.groupBy("trip_start_station").agg(avg("trip_duration").alias("avg_trip_duration")).orderBy("trip_start_station")
+timeSpentPerRide_StartStation = timeSpentPerRide_StartStation.withColumn("avg_trip_duration", round(timeSpentPerRide_StartStation["avg_trip_duration"], 2))
+display(timeSpentPerRide_StartStation)
+
+#1D) Based on which station is the ending station
+timeSpentPerRide_EndStation = gold_df_f_trips.join(gold_df_d_stations, gold_df_f_trips.end_station_id == gold_df_d_stations.station_id, how="left") \
+                            .withColumnRenamed("name", "trip_end_station") \
+                            .drop("station_id")
+
+timeSpentPerRide_EndStation = timeSpentPerRide_EndStation.groupBy("trip_end_station").agg(avg("trip_duration").alias("avg_trip_duration")).orderBy("trip_end_station")
+timeSpentPerRide_EndStation = timeSpentPerRide_EndStation.withColumn("avg_trip_duration", round(timeSpentPerRide_EndStation["avg_trip_duration"], 2))
+display(timeSpentPerRide_EndStation)
+
+# COMMAND ----------
+
+#1E) Based on age of the rider at time of the ride
+timeSpentPerRide_RiderAge = gold_df_f_trips.groupBy("rider_age").agg(avg("trip_duration").alias("avg_trip_duration")).orderBy("rider_age")
+timeSpentPerRide_RiderAge = timeSpentPerRide_RiderAge.withColumn("avg_trip_duration", round(timeSpentPerRide_RiderAge["avg_trip_duration"], 2))
+display(timeSpentPerRide_RiderAge)
+
+#1F) Based on whether the rider is a a member or a casual rider
+timeSpentPerRide_RiderType = gold_df_f_trips.join(gold_df_d_riders, on="rider_id", how="left") \
+                            .drop("rider_id")
+
+timeSpentPerRide_RiderType = timeSpentPerRide_RiderType.groupBy("is_member").agg(avg("trip_duration").alias("avg_trip_duration")).orderBy("is_member")
+timeSpentPerRide_RiderType = timeSpentPerRide_RiderType.withColumn("avg_trip_duration", round(timeSpentPerRide_RiderType["avg_trip_duration"], 2))
+display(timeSpentPerRide_RiderType)
+
+# COMMAND ----------
+
+from pyspark.sql.functions import sum, quarter, round, when
+#Analyse how much money is spent
+#2A) Per month
+
+moneySpentPerRide = gold_df_f_payments.join(gold_df_d_dates, on="date_id", how="left") \
+                            .withColumnRenamed("date", "payment_date") \
+                            .drop("date_id")
+
+moneySpentPerRide_month = moneySpentPerRide.withColumn("month", date_format(moneySpentPerRide["payment_date"], "MM-yyyy"))
+moneySpentPerRide_month = moneySpentPerRide_month.groupBy("month").agg(sum("amount").alias("monthly_amount")).orderBy("month")
+
+moneySpentPerRide_month2 = moneySpentPerRide_month.withColumn("month", substring(moneySpentPerRide_month["month"], 1, 2))
+moneySpentPerRide_month2 = moneySpentPerRide_month2.groupBy("month").agg(avg("monthly_amount").alias("avg_monthly_amount")).orderBy("month")
+
+moneySpentPerRide_month2 = moneySpentPerRide_month2.withColumn("avg_monthly_amount", round(moneySpentPerRide_month2["avg_monthly_amount"], 2))
+display(moneySpentPerRide_month2)
+#print(moneySpentPerRide)
+
+#2B) Per quarter
+moneySpentPerRide_quarter = moneySpentPerRide_month2.withColumn("month", col("month").cast("int"))
+moneySpentPerRide_quarter = moneySpentPerRide_quarter.withColumn("quarter", when(moneySpentPerRide_quarter["month"].between(1, 3), 1) \
+                                                                             .when(moneySpentPerRide_quarter["month"].between(4, 6), 2) \
+                                                                             .when(moneySpentPerRide_quarter["month"].between(7, 9), 3) \
+                                                                             .otherwise(4))
+
+moneySpentPerRide_quarter = moneySpentPerRide_quarter.groupBy("quarter").agg(sum("avg_monthly_amount").alias("quarterly_amount")).orderBy("quarter")
+moneySpentPerRide_quarter = moneySpentPerRide_quarter.withColumn("quarterly_amount", round(moneySpentPerRide_quarter["quarterly_amount"], 2))
+display(moneySpentPerRide_quarter)
+
+#2c) Per year
+moneySpentPerRide_year = moneySpentPerRide.withColumn("year", date_format(moneySpentPerRide["payment_date"], "yyyy"))
+moneySpentPerRide_year = moneySpentPerRide_year.groupBy("year").agg(sum("amount").alias("yearly_amount")).orderBy("year")
+moneySpentPerRide_year = moneySpentPerRide_year.withColumn("yearly_amount", round(moneySpentPerRide_year["yearly_amount"], 2))
+display(moneySpentPerRide_year)
+
+# COMMAND ----------
+
+from pyspark.sql.functions import year
+
+#2D) Per member, based on the age of the rider at account start
+moneySpentPerRiderAge = gold_df_f_payments.join(gold_df_d_riders, on="rider_id", how="left") \
+                            .drop("rider_id")
+
+moneySpentPerRiderAge = moneySpentPerRiderAge.withColumn("age_at_creation", year(moneySpentPerRiderAge["account_start"]) - year(moneySpentPerRiderAge["birthday"]))
+
+moneySpentPerRiderAge = moneySpentPerRiderAge.groupBy("age_at_creation").agg(sum("amount").alias("amount_per_age")).orderBy("age_at_creation")
+moneySpentPerRiderAge = moneySpentPerRiderAge.withColumn("amount_per_age", round(moneySpentPerRiderAge["amount_per_age"], 2))
+
+display(moneySpentPerRiderAge)
