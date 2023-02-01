@@ -1,9 +1,22 @@
 # Databricks notebook source
+#Delete folder
+dbutils.fs.rm("/tmp/abdusgithub/", True)
+
+#get files from GitHub
+!wget "https://github.com/abdusqualyfi/StarSchemaProject/blob/main/files/payments.zip" -P "/dbfs/tmp/abdusgithub/"
+!wget "https://github.com/abdusqualyfi/StarSchemaProject/blob/main/files/riders.zip" -P "/dbfs/tmp/abdusgithub/"
+!wget "https://github.com/abdusqualyfi/StarSchemaProject/blob/main/files/stations.zip" -P "/dbfs/tmp/abdusgithub/"
+!wget "https://github.com/abdusqualyfi/StarSchemaProject/blob/main/files/trips.zip" -P "/dbfs/tmp/abdusgithub/"
+
+#dbutils.fs.cp("file:/tmp/payments.zip", "dbfs:/tmp/AbdusGitHub/landing/payments.zip")
+
+# COMMAND ----------
+
 import zipfile, subprocess, glob
 
 #Directories - ensure / is at the end
 main_folder = "/tmp/Abdus/" #This folder has to exist first for it to work
-zip_location_folder = "/dbfs/tmp/landing/"
+zip_location_folder = "/dbfs/tmp/abdusgithub/" #does not work
 zip_output_folder = "/dbfs/tmp/Abdus/landing"
 dbfs_directory = 'dbfs:/tmp/Abdus/landing/'
 
@@ -12,13 +25,15 @@ dbutils.fs.rm(main_folder, True)
 dbutils.fs.mkdirs(main_folder)
 
 #Extract all zips in a given location
+#zip_files = glob.glob("/dbfs/tmp/abdusgithub/*.zip")
 zip_files = glob.glob("/dbfs/tmp/landing/*.zip")
 for zip_file in zip_files:
-    extract_to_dir = "/dbfs/tmp/Abdus/landing"
+    extract_to_dir = zip_output_folder
     subprocess.call(["unzip", "-d", extract_to_dir, zip_file])
 
 #Check directory exists and has the extract csv files in it
 print(dbutils.fs.ls('/tmp/Abdus/landing'))
+print(dbutils.fs.ls('/tmp/abdusgithub/'))
 
 # COMMAND ----------
 
@@ -343,7 +358,7 @@ print(gold_df_d_times)
 
 # COMMAND ----------
 
-from pyspark.sql.functions import date_format, avg, substring
+from pyspark.sql.functions import date_format, avg, substring, round
 
 #Analyse how much time is spent per ride
 
@@ -406,7 +421,7 @@ display(timeSpentPerRide_RiderType)
 
 # COMMAND ----------
 
-from pyspark.sql.functions import sum, quarter, round, when
+from pyspark.sql.functions import sum, quarter, when
 #Analyse how much money is spent
 #2A) Per month
 
@@ -455,3 +470,52 @@ moneySpentPerRiderAge = moneySpentPerRiderAge.groupBy("age_at_creation").agg(sum
 moneySpentPerRiderAge = moneySpentPerRiderAge.withColumn("amount_per_age", round(moneySpentPerRiderAge["amount_per_age"], 2))
 
 display(moneySpentPerRiderAge)
+
+# COMMAND ----------
+
+#EXTRA CREDIT - Analyse how much money is spent per member
+#3A) Based on how many rides the rider averages per month
+
+memberTrip = gold_df_f_trips.select("rider_id", "started_date_id")
+memberRiders = gold_df_d_riders.select("rider_id", "is_member")
+memberPayment = gold_df_f_payments.select("rider_id", "amount")
+
+memberAvgTripMonth = memberTrip.join(memberRiders, on="rider_id", how="left")
+memberAvgTripMonth = memberAvgTripMonth.filter(col("is_member") == True)
+
+memberAvgTripMonth = memberAvgTripMonth.join(memberPayment, on="rider_id", how="left")
+
+memberAvgTripMonth = memberAvgTripMonth.join(gold_df_d_dates, memberAvgTripMonth.started_date_id == gold_df_d_dates.date_id, how="left") \
+                            .withColumnRenamed("date", "month") \
+                            .drop("date_id")
+
+memberAvgTripMonth = memberAvgTripMonth.withColumn("month", date_format(memberAvgTripMonth["month"], "MMMM"))
+
+memberAvgTripMonth = memberAvgTripMonth.groupBy("rider_id", "month").agg(sum("amount").alias("total_amount")).orderBy("rider_id")
+
+
+display(memberAvgTripMonth)
+
+# COMMAND ----------
+
+#3B) Based on how many minutes the rider spends on a bike per month
+
+memberTripMins = gold_df_f_trips.select("rider_id", "started_date_id", "trip_duration")
+
+memberAvgTripMinutes = memberTripMins.join(memberRiders, on="rider_id", how="left")
+memberAvgTripMinutes = memberAvgTripMinutes.filter(col("is_member") == True)
+
+memberAvgTripMinutes = memberAvgTripMinutes.join(memberPayment, on="rider_id", how="left")
+
+memberAvgTripMinutes = memberAvgTripMinutes.join(gold_df_d_dates, memberAvgTripMinutes.started_date_id == gold_df_d_dates.date_id, how="left") \
+                            .withColumnRenamed("date", "month") \
+                            .drop("date_id")
+
+memberAvgTripMinutes = memberAvgTripMinutes.withColumn("month", date_format(memberAvgTripMinutes["month"], "MMMM")) \
+                            .drop("started_date_id", "is_member")
+
+memberAvgTripMinutes = memberAvgTripMinutes.groupBy("rider_id", "month", "trip_duration").agg(sum("amount").alias("total_amount")).orderBy("rider_id")
+
+
+display(memberAvgTripMinutes)
+
