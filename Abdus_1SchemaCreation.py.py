@@ -1,12 +1,19 @@
 # Databricks notebook source
-#Delete folder
-dbutils.fs.rm("/tmp/abdusgithub/", True)
+#Directories - ensure / is at the end
+main_folder = "/tmp/Abdus/" #This folder has to exist first for it to work
+zip_location_folder = "/dbfs/tmp/Abdus/github/" #does not work
+zip_output_folder = "/dbfs/tmp/Abdus/landing"
+dbfs_directory = 'dbfs:/tmp/Abdus/landing/'
+
+#Delete everything in destination folder
+dbutils.fs.rm(main_folder, True)
+dbutils.fs.mkdirs(main_folder)
 
 #get files from GitHub
-!wget "https://github.com/abdusqualyfi/StarSchemaProject/blob/main/files/payments.zip" -P "/dbfs/tmp/abdusgithub/"
-!wget "https://github.com/abdusqualyfi/StarSchemaProject/blob/main/files/riders.zip" -P "/dbfs/tmp/abdusgithub/"
-!wget "https://github.com/abdusqualyfi/StarSchemaProject/blob/main/files/stations.zip" -P "/dbfs/tmp/abdusgithub/"
-!wget "https://github.com/abdusqualyfi/StarSchemaProject/blob/main/files/trips.zip" -P "/dbfs/tmp/abdusgithub/"
+!wget "https://github.com/abdusqualyfi/StarSchemaProject/raw/main/files/payments.zip" -P zip_location_folder
+!wget "https://github.com/abdusqualyfi/StarSchemaProject/raw/main/files/riders.zip" -P zip_location_folder
+!wget "https://github.com/abdusqualyfi/StarSchemaProject/raw/main/files/stations.zip" -P zip_location_folder
+!wget "https://github.com/abdusqualyfi/StarSchemaProject/raw/main/files/trips.zip" -P zip_location_folder
 
 #dbutils.fs.cp("file:/tmp/payments.zip", "dbfs:/tmp/AbdusGitHub/landing/payments.zip")
 
@@ -21,12 +28,12 @@ zip_output_folder = "/dbfs/tmp/Abdus/landing"
 dbfs_directory = 'dbfs:/tmp/Abdus/landing/'
 
 #Delete everything in destination folder
-dbutils.fs.rm(main_folder, True)
+#dbutils.fs.rm(main_folder, True)
 dbutils.fs.mkdirs(main_folder)
 
 #Extract all zips in a given location
 #zip_files = glob.glob("/dbfs/tmp/abdusgithub/*.zip")
-zip_files = glob.glob("/dbfs/tmp/landing/*.zip")
+zip_files = glob.glob("/dbfs/tmp/abdusgithub/*.zip")
 for zip_file in zip_files:
     extract_to_dir = zip_output_folder
     subprocess.call(["unzip", "-d", extract_to_dir, zip_file])
@@ -110,6 +117,7 @@ from pyspark.sql.functions import col, cast, unix_timestamp, from_unixtime, date
 #New defined schema for silver
 
 #Silver Trips DF
+
 silver_trips_df = bronze_to_silverdf_trip.withColumn("trip_id", bronze_to_silverdf_trip["trip_id"].cast("string")) \
                                         .withColumn("rideable_type", bronze_to_silverdf_trip["rideable_type"].cast("string")) \
                                         .withColumn("started_at", unix_timestamp(bronze_to_silverdf_trip["started_at"], "dd/MM/yyyy HH:mm").cast("timestamp")) \
@@ -493,7 +501,6 @@ memberAvgTripMonth = memberAvgTripMonth.withColumn("month", date_format(memberAv
 
 memberAvgTripMonth = memberAvgTripMonth.groupBy("rider_id", "month").agg(sum("amount").alias("total_amount")).orderBy("rider_id")
 
-
 display(memberAvgTripMonth)
 
 # COMMAND ----------
@@ -511,11 +518,11 @@ memberAvgTripMinutes = memberAvgTripMinutes.join(gold_df_d_dates, memberAvgTripM
                             .withColumnRenamed("date", "month") \
                             .drop("date_id")
 
-memberAvgTripMinutes = memberAvgTripMinutes.withColumn("month", date_format(memberAvgTripMinutes["month"], "MMMM")) \
+memberAvgTripMinutes = memberAvgTripMinutes.withColumn("month", date_format(memberAvgTripMinutes["month"], "MMMM-YYYY")) \
                             .drop("started_date_id", "is_member")
 
 memberAvgTripMinutes = memberAvgTripMinutes.groupBy("rider_id", "month", "trip_duration").agg(sum("amount").alias("total_amount")).orderBy("rider_id")
-
+#Rider_ID 9658 duplicate
 
 display(memberAvgTripMinutes)
 
