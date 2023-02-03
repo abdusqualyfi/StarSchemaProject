@@ -10,37 +10,24 @@ dbutils.fs.rm(main_folder, True)
 dbutils.fs.mkdirs(main_folder)
 
 #get files from GitHub
-!wget "https://github.com/abdusqualyfi/StarSchemaProject/raw/main/files/payments.zip" -P zip_location_folder
-!wget "https://github.com/abdusqualyfi/StarSchemaProject/raw/main/files/riders.zip" -P zip_location_folder
-!wget "https://github.com/abdusqualyfi/StarSchemaProject/raw/main/files/stations.zip" -P zip_location_folder
-!wget "https://github.com/abdusqualyfi/StarSchemaProject/raw/main/files/trips.zip" -P zip_location_folder
-
-#dbutils.fs.cp("file:/tmp/payments.zip", "dbfs:/tmp/AbdusGitHub/landing/payments.zip")
+!wget "https://github.com/abdusqualyfi/StarSchemaProject/raw/main/files/payments.zip" -P "/dbfs/tmp/Abdus/github/"
+!wget "https://github.com/abdusqualyfi/StarSchemaProject/raw/main/files/riders.zip" -P "/dbfs/tmp/Abdus/github/"
+!wget "https://github.com/abdusqualyfi/StarSchemaProject/raw/main/files/stations.zip" -P "/dbfs/tmp/Abdus/github/"
+!wget "https://github.com/abdusqualyfi/StarSchemaProject/raw/main/files/trips.zip" -P "/dbfs/tmp/Abdus/github/"
 
 # COMMAND ----------
 
 import zipfile, subprocess, glob
 
-#Directories - ensure / is at the end
-main_folder = "/tmp/Abdus/" #This folder has to exist first for it to work
-zip_location_folder = "/dbfs/tmp/abdusgithub/" #does not work
-zip_output_folder = "/dbfs/tmp/Abdus/landing"
-dbfs_directory = 'dbfs:/tmp/Abdus/landing/'
-
-#Delete everything in destination folder
-#dbutils.fs.rm(main_folder, True)
-dbutils.fs.mkdirs(main_folder)
-
 #Extract all zips in a given location
 #zip_files = glob.glob("/dbfs/tmp/abdusgithub/*.zip")
-zip_files = glob.glob("/dbfs/tmp/abdusgithub/*.zip")
+zip_files = glob.glob(zip_location_folder + "*.zip")
 for zip_file in zip_files:
     extract_to_dir = zip_output_folder
     subprocess.call(["unzip", "-d", extract_to_dir, zip_file])
 
 #Check directory exists and has the extract csv files in it
 print(dbutils.fs.ls('/tmp/Abdus/landing'))
-print(dbutils.fs.ls('/tmp/abdusgithub/'))
 
 # COMMAND ----------
 
