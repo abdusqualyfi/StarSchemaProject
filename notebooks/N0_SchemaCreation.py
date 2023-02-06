@@ -8,7 +8,7 @@ from pyspark.sql.types import *
 
 #Trip
 bronze_trips_header = ['trip_id', 'rideable_type', 'started_at', 'ended_at', 'start_station_id', 'end_station_id', 'rider_id']
-bronze_trips_schema = StructType([StructField(col, StringType(), True) for col in bronze_trip_header])
+bronze_trips_schema = StructType([StructField(col, StringType(), True) for col in bronze_trips_header])
 
 #Payments
 bronze_payments_header = ['payment_id', 'date', 'amount', 'rider_id']

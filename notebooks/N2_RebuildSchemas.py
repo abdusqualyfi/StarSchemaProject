@@ -1,5 +1,6 @@
 # Databricks notebook source
 #Directories
+main_folder = "/tmp/Abdus/"
 
 dir_bronze = "/tmp/Abdus/Bronze/"
 
@@ -9,7 +10,11 @@ dir_gold = "/tmp/Abdus/Gold/"
 
 # COMMAND ----------
 
-# MAGIC %run /Repos/abdus.choudhury@qualyfi.co.uk/steven-repo/final_notebooks/SchemaCreation
+dbutils.fs.mkdirs(main_folder)
+
+# COMMAND ----------
+
+# MAGIC %run /Repos/abdus.choudhury@qualyfi.co.uk/StarSchemaProject/notebooks/N0_SchemaCreation
 
 # COMMAND ----------
 
@@ -56,4 +61,18 @@ silver_stations_df.write.format("delta").mode("overwrite").save(dir_silver + "st
 
 # COMMAND ----------
 
+gold_trips_df = spark.createDataFrame(empty_df, gold_trips_schema)
+gold_payments_df = spark.createDataFrame(empty_df, gold_payments_schema)
+gold_riders_df = spark.createDataFrame(empty_df, gold_riders_schema)
+gold_stations_df = spark.createDataFrame(empty_df, gold_stations_schema)
+gold_bikes_df = spark.createDataFrame(empty_df, gold_bikes_schema)
+gold_dates_df = spark.createDataFrame(empty_df, gold_dates_schema)
+gold_times_df = spark.createDataFrame(empty_df, gold_times_schema)
 
+gold_trips_df.write.format("delta").mode("overwrite").save(dir_gold + "fact_trips")
+gold_payments_df.write.format("delta").mode("overwrite").save(dir_gold + "fact_payments")
+gold_riders_df.write.format("delta").mode("overwrite").save(dir_gold + "dim_riders")
+gold_stations_df.write.format("delta").mode("overwrite").save(dir_gold + "dim_stations")
+gold_bikes_df.write.format("delta").mode("overwrite").save(dir_gold + "dim_bikes")
+gold_dates_df.write.format("delta").mode("overwrite").save(dir_gold + "dim_dates")
+gold_times_df.write.format("delta").mode("overwrite").save(dir_gold + "dim_times")
