@@ -343,13 +343,13 @@ display(gold_df_d_times)
 # COMMAND ----------
 
 #Test Queries
-print(gold_df_f_trips) #show trips fact table
-print(gold_df_f_payments)
-print(gold_df_d_riders)
-print(gold_df_d_stations)
-print(gold_df_d_bikes)
-print(gold_df_d_dates)
-print(gold_df_d_times) 
+gold_df_f_trips.printSchema() #show trips fact table
+gold_df_f_payments.printSchema()
+gold_df_d_riders.printSchema()
+gold_df_d_stations.printSchema()
+gold_df_d_bikes.printSchema()
+gold_df_d_dates.printSchema()
+gold_df_d_times.printSchema()
 
 # COMMAND ----------
 
@@ -505,7 +505,7 @@ memberAvgTripMinutes = memberAvgTripMinutes.join(gold_df_d_dates, memberAvgTripM
                             .withColumnRenamed("date", "month") \
                             .drop("date_id")
 
-memberAvgTripMinutes = memberAvgTripMinutes.withColumn("month", date_format(memberAvgTripMinutes["month"], "MMMM-YYYY")) \
+memberAvgTripMinutes = memberAvgTripMinutes.withColumn("month", date_format(memberAvgTripMinutes["month"], "MMMM")) \
                             .drop("started_date_id", "is_member")
 
 memberAvgTripMinutes = memberAvgTripMinutes.groupBy("rider_id", "month", "trip_duration").agg(sum("amount").alias("total_amount")).orderBy("rider_id")
