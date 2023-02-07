@@ -8,7 +8,7 @@
 
 Hi all! This project uses raw data from a bike sharing program, converts and manipulates it to a star schema format to provide useful querying to answer business questions. The files in this repository are used in the project, therefore any changes made here will also affect running this project in Databricks.
 
-This project uses a total of 8 notebooks - 6 of which run automatically via a workflow. The first notebook N0 creates the schema for the bronze, silver and gold notebooks. It is also used in the final notebook, AutomatedTests to assert if the schema of the final tables are correct. The second notebook N1 destroys any schema or database in a specified folder to ensure it is ready for rebuilding, which is what the third notebook N2 does. Notebooks N3-N5 use the Medallion Architecture to ingest, cleanse, manipulate and transform data. Notebook N6 answers specified business questions and the final notebook N7 runs asserts to confirm the data is correct and valid.
+This project uses a total of 8 notebooks - 6 of which run automatically via a workflow. The first notebook `N0` creates the schema for the bronze, silver and gold notebooks. It is also used in the final notebook, AutomatedTests to assert if the schema of the final tables are correct. The second notebook `N1` destroys any schema or database in a specified folder to ensure it is ready for rebuilding, which is what the third notebook `N2` does. Notebooks `N3`-`N5` use the Medallion Architecture to ingest, cleanse, manipulate and transform data. Notebook `N6` answers specified business questions and the final notebook `N7` runs asserts to confirm the data is correct and valid.
 
    <details>
    <summary>Notebooks</summary>
