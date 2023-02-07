@@ -252,6 +252,7 @@ memberAvgTripMinutes = memberAvgTripMinutes.withColumn("month", date_format(memb
                             .drop("started_date_id", "is_member")
 
 memberAvgTripMinutes = memberAvgTripMinutes.groupBy("rider_id", "month", "trip_duration").agg(sum("amount").alias("total_amount")).orderBy("rider_id")
+memberAvgTripMinutes = memberAvgTripMinutes.groupBy("rider_id", "month", "total_amount").agg(sum("trip_duration").alias("trip_duration")).orderBy("rider_id")
 #Rider_ID 9658 duplicate
 
 display(memberAvgTripMinutes)

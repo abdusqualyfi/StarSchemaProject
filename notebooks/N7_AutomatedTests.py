@@ -77,6 +77,6 @@ assert moneySpentPerRiderAge.count() == 69, "Incorrect number of rows in Q2D, ex
 assert memberAvgTripMonth.count() == 116, "Incorrect number of rows in Q3A, expecting 116"
 
 #Q3B) memberAvgTripMinutes
-assert memberAvgTripMinutes.count() == 117, "Incorrect number of rows in Q3B, expecting 117"
+assert memberAvgTripMinutes.count() == 116, "Incorrect number of rows in Q3B, expecting 116"
 
 
