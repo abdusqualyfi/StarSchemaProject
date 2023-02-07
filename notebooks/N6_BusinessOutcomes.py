@@ -173,7 +173,7 @@ display(moneySpentPerRide_perQuarter)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC Per year
+# MAGIC 2C) Per year
 
 # COMMAND ----------
 
